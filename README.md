@@ -7,6 +7,12 @@ Es **online y multiusuario**: corre sobre **Google Apps Script + Google Sheets**
 vendedor entra con su cuenta de Google del dominio y ve solo sus propiedades; los
 administradores ven todo. Los datos y archivos quedan en Google Drive.
 
+## Acceso
+
+Los vendedores entran desde **https://majaxu.github.io/pipelineacm/**, que redirige a la
+aplicación (hay que iniciar sesión con la cuenta del dominio `@juarezbeltran.com.ar`).
+Esa página es el `index.html` de la raíz, servido por GitHub Pages.
+
 ## Estructura
 
 ```

@@ -38,6 +38,7 @@ const HEADERS = [
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('Pipeline ACM · Juarez Beltrán')
+    .setFaviconUrl('https://majaxu.github.io/pipelineacm/favicon.svg')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1.0')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
