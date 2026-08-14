@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<base target="_top">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pipeline ACM · Juarez Beltrán</title>
+<style>
+  :root{
+    --navy:#10295a;
+    --navy-2:#17386f;
+    --ink:#142033;
+    --muted:#6d7888;
+    --line:#dce3ed;
+    --panel:#ffffff;
+    --bg:#f4f7fb;
+    --ok:#1f9d61;
+    --danger:#cc3d4a;
+    --warning:#d98f1b;
+    --soft:#edf2f7;
+    --shadow:0 12px 30px rgba(16,41,90,.10);
+    --radius:18px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color:var(--ink);
+    background:var(--bg);
+  }
+  button,input,textarea,select{font:inherit}
+  button{cursor:pointer}
+  a{color:inherit}
+
+  .app{max-width:1550px;margin:0 auto;padding:22px}
+  .topbar{
+    display:flex;gap:18px;align-items:center;justify-content:space-between;
+    background:linear-gradient(135deg,var(--navy),var(--navy-2));
+    color:white;padding:22px 24px;border-radius:22px;box-shadow:var(--shadow);
+    position:sticky;top:12px;z-index:10;
+  }
+  .brand h1{font-size:24px;margin:0 0 4px;font-weight:850;letter-spacing:.1px}
+  .brand p{margin:0;opacity:.82;font-size:14px}
+  .actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+  .userchip{
+    display:flex;flex-direction:column;align-items:flex-end;gap:2px;
+    font-size:12px;opacity:.92;margin-right:4px;text-align:right
+  }
+  .userchip b{font-weight:800}
+  .userchip .role{
+    font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
+    background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.24);
+    padding:2px 7px;border-radius:999px
+  }
+  .btn{
+    border:0;border-radius:12px;padding:10px 14px;font-weight:750;
+    display:inline-flex;align-items:center;gap:8px;
+  }
+  .btn.primary{background:white;color:var(--navy)}
+  .btn.secondary{background:rgba(255,255,255,.12);color:white;border:1px solid rgba(255,255,255,.2)}
+  .btn.ghost{background:#fff;color:var(--navy);border:1px solid var(--line)}
+  .btn.danger{background:#fff0f1;color:#9e2732;border:1px solid #f2c8cd}
+  .btn.small{padding:7px 10px;font-size:12px;border-radius:9px}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+
+  .stats{
+    display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0;
+  }
+  .stat{
+    background:white;border:1px solid var(--line);border-radius:16px;padding:16px 18px;
+    box-shadow:0 5px 20px rgba(16,41,90,.05)
+  }
+  .stat .n{font-size:28px;font-weight:900;line-height:1}
+  .stat .l{font-size:12px;color:var(--muted);margin-top:6px;font-weight:700;text-transform:uppercase;letter-spacing:.55px}
+
+  .toolbar{
+    display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px;
+  }
+  .toolbar input,.toolbar select{
+    background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px 12px;color:var(--ink);
+  }
+  .toolbar input{min-width:280px;flex:1}
+  .toolbar .count{font-size:13px;color:var(--muted);font-weight:650;margin-left:auto}
+
+  .list{display:flex;flex-direction:column;gap:12px}
+  .property{
+    --p:0;
+    border-radius:18px;
+    border:1px solid var(--line);
+    overflow:hidden;
+    box-shadow:0 7px 24px rgba(16,41,90,.06);
+    background:
+      linear-gradient(90deg,
+        rgba(235,239,244,1) 0%,
+        rgba(235,239,244,1) calc((100 - var(--p))*1%),
+        rgba(31,157,97,.10) calc((100 - var(--p))*1%),
+        rgba(31,157,97,.19) 100%);
+    transition:background .25s ease,border-color .25s ease,transform .2s ease;
+  }
+  .property:hover{transform:translateY(-1px)}
+  .property[data-status="cancelado"]{
+    background:#fff1f2;border-color:#f2c3c8;
+  }
+  .property[data-status="completo"]{
+    background:linear-gradient(90deg,#dff4e9,#cbeddb);
+    border-color:#aedbc4;
+  }
+
+  .row{
+    display:grid;
+    grid-template-columns:minmax(260px,1.3fr) minmax(550px,3fr) 170px 44px;
+    gap:14px;align-items:center;padding:14px 16px;
+  }
+  .identity{min-width:0}
+  .address{font-weight:900;font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .owner{color:var(--muted);font-size:13px;margin-top:3px}
+  .meta{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
+  .pill{
+    display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:5px 8px;
+    font-size:11px;font-weight:800;background:#fff;border:1px solid rgba(16,41,90,.10)
+  }
+  .pill.cancel{color:#a72e39;background:#fff3f4;border-color:#f1c5ca}
+  .pill.done{color:#157548;background:#effaf4;border-color:#cbead9}
+  .pill.vendor{color:#274690;background:#eef2fb;border-color:#cdd8f0}
+
+  .milestones{
+    display:grid;grid-template-columns:repeat(8,minmax(58px,1fr));gap:7px;
+  }
+  .milestone{
+    position:relative;border:1px solid rgba(16,41,90,.12);background:rgba(255,255,255,.78);
+    border-radius:11px;padding:8px 7px 7px;min-height:54px;text-align:center;width:100%;margin:0;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+    transition:.18s ease;cursor:pointer;color:inherit;font-family:inherit;
+  }
+  .milestone:hover{background:#fff;border-color:#b9c7da}
+  .milestone.active{border-color:#8da6c9;box-shadow:0 0 0 2px rgba(23,56,111,.12)}
+  .milestone.done{background:#e9f8f0;border-color:#a9dcc4;color:#116a42}
+  .milestone.disabled{opacity:.55}
+  .milestone input{position:absolute;opacity:0;pointer-events:none}
+  .tick{
+    width:17px;height:17px;border-radius:5px;border:2px solid currentColor;
+    display:grid;place-items:center;font-size:11px;line-height:1;color:#7a8798;
+  }
+  .done .tick{color:#16784b;background:#16784b;border-color:#16784b}
+  .done .tick::after{content:"✓";color:#fff;font-weight:900}
+  .milestone span:last-child{font-size:10px;font-weight:850;line-height:1.05}
+
+  .progressBox{min-width:0}
+  .progressTop{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:850;margin-bottom:7px}
+  .progressTop .pct{font-size:14px;color:var(--navy)}
+  .bar{height:9px;background:rgba(255,255,255,.72);border-radius:999px;border:1px solid rgba(16,41,90,.08);overflow:hidden}
+  .bar > div{height:100%;width:0;background:linear-gradient(90deg,#84c9a7,#238c5b);transition:width .25s ease}
+  .del{
+    width:38px;height:38px;border:1px solid rgba(16,41,90,.12);background:rgba(255,255,255,.9);
+    border-radius:10px;color:#9aa6b6;display:grid;place-items:center;cursor:pointer;transition:.15s ease;
+  }
+  .del:hover{color:#b8323f;border-color:#f1c5ca;background:#fff3f4}
+  .del svg{width:18px;height:18px}
+  .rowlinks{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+  .rowlink{
+    border:1px solid var(--line);background:#fff;color:var(--navy);border-radius:8px;
+    padding:4px 9px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;
+  }
+  .rowlink:hover{border-color:#b9c7da}
+  .rowlink.active{border-color:#8da6c9;box-shadow:0 0 0 2px rgba(23,56,111,.12)}
+
+  .details{
+    display:none;background:rgba(255,255,255,.93);border-top:1px solid var(--line);
+    padding:16px;
+  }
+  .property.open .details{display:block}
+  .detailsHint{font-size:11px;color:var(--muted);font-weight:700;margin:0 0 10px}
+
+  /* --- Paneles de detalle (uno por paso) --- */
+  .panels{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;align-items:start}
+  .panel{display:none;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px}
+  .panel.extra{background:#f7f9fc}
+  /* Un cuadradito abre sólo su panel */
+  .property.open .panels .panel.active{display:block}
+  .panel h3{margin:0 0 12px;font-size:13px;color:var(--navy);text-transform:uppercase;letter-spacing:.45px;display:flex;align-items:center;gap:8px}
+  .panel h3 .pnum{width:22px;height:22px;border-radius:7px;background:#eaf0fb;color:#0e2149;display:grid;place-items:center;font-size:12px;font-weight:900;flex:0 0 auto}
+
+  .field{margin:0 0 10px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:11px;font-weight:800;color:#556172;margin:0 0 5px}
+  .field input[type="text"], .field input[type="url"], .field input[type="date"], .field textarea, .field select{
+    width:100%;border:1px solid #d9e0e9;border-radius:10px;padding:9px 10px;background:#fbfcfe;color:var(--ink);
+    outline:none;
+  }
+  .field textarea{min-height:60px;resize:vertical}
+  .field input:focus,.field textarea:focus,.field select:focus{border-color:#8da6c9;box-shadow:0 0 0 3px rgba(23,56,111,.08)}
+  .checkline{
+    display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px dashed #e6ebf1;font-size:12px;font-weight:700;
+  }
+  .checkline:last-child{border-bottom:0}
+  .checkline input{margin-top:2px;accent-color:var(--ok)}
+  .docrow{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:end}
+  .linkBtn{white-space:nowrap}
+  .upRow{display:flex;gap:7px;flex-wrap:wrap}
+  .hint{font-size:10px;color:var(--muted);margin-top:4px}
+  .footerActions{
+    display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)
+  }
+  .created{font-size:11px;color:var(--muted)}
+  .rightBtns{display:flex;gap:8px;flex-wrap:wrap}
+
+  .empty{
+    text-align:center;padding:56px 20px;background:white;border:1px dashed #bdc8d7;border-radius:18px;color:var(--muted)
+  }
+  .empty strong{display:block;color:var(--navy);font-size:18px;margin-bottom:6px}
+  .loader{
+    text-align:center;padding:56px 20px;background:white;border:1px solid var(--line);border-radius:18px;color:var(--muted);font-weight:700
+  }
+
+  .modal-ov{
+    position:fixed;inset:0;background:rgba(8,18,35,.52);display:none;
+    align-items:center;justify-content:center;z-index:200;padding:20px;
+  }
+  .modal-ov.show{display:flex}
+  .modal-card{
+    width:min(660px,100%);border-radius:20px;overflow:hidden;background:#fff;box-shadow:0 25px 70px rgba(0,0,0,.3)
+  }
+  .modalHead{padding:18px 20px;background:var(--navy);color:white}
+  .modalHead h2{margin:0;font-size:18px}
+  .modalBody{padding:18px 20px;background:white}
+  .modalGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .modalFoot{display:flex;justify-content:flex-end;gap:8px;padding:0 20px 18px;background:white}
+  .full{grid-column:1/-1}
+
+  .toast{
+    position:fixed;right:22px;bottom:22px;background:#11264d;color:white;padding:12px 14px;border-radius:12px;
+    box-shadow:var(--shadow);font-size:12px;font-weight:750;opacity:0;transform:translateY(10px);pointer-events:none;transition:.2s;z-index:100
+  }
+  .toast.show{opacity:1;transform:translateY(0)}
+  .toast.err{background:#7c1d27}
+  .savingDot{
+    position:fixed;left:22px;bottom:22px;background:#fff;color:var(--navy);border:1px solid var(--line);
+    padding:8px 12px;border-radius:999px;font-size:11px;font-weight:800;box-shadow:var(--shadow);
+    opacity:0;transform:translateY(8px);transition:.2s;z-index:100
+  }
+  .savingDot.show{opacity:1;transform:translateY(0)}
+
+  @media (max-width:1150px){
+    .row{grid-template-columns:1fr 1.9fr 150px 40px}
+    .milestones{grid-template-columns:repeat(4,1fr)}
+  }
+  @media (max-width:780px){
+    .app{padding:10px}
+    .topbar{position:static;align-items:flex-start;flex-direction:column;border-radius:16px}
+    .userchip{align-items:flex-start;text-align:left}
+    .stats{grid-template-columns:1fr 1fr}
+    .row{grid-template-columns:1fr 42px}
+    .identity{grid-column:1;grid-row:1}
+    .del{grid-column:2;grid-row:1;justify-self:end}
+    .milestones,.progressBox{grid-column:1/-1}
+    .milestones{grid-template-columns:repeat(4,1fr)}
+    .panels{grid-template-columns:1fr}
+    .modalGrid{grid-template-columns:1fr}
+    .toolbar input{min-width:100%}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <h1>Pipeline de Captación · ACM</h1>
+      <p>Seguimiento de leads, hitos, documentación e informes de comercialización.</p>
+    </div>
+    <div class="actions">
+      <div class="userchip" id="userChip" style="display:none">
+        <b id="userEmail"></b>
+        <span class="role" id="userRole">Vendedor</span>
+      </div>
+      <button class="btn primary" id="newBtn">＋ Nueva propiedad</button>
+    </div>
+  </header>
+
+  <section class="stats">
+    <div class="stat"><div class="n" id="stTotal">0</div><div class="l">Propiedades</div></div>
+    <div class="stat"><div class="n" id="stActive">0</div><div class="l">Leads activos</div></div>
+    <div class="stat"><div class="n" id="stDone">0</div><div class="l">Completados</div></div>
+    <div class="stat"><div class="n" id="stAvg">0%</div><div class="l">Avance promedio</div></div>
+  </section>
+
+  <section class="toolbar">
+    <input id="search" type="search" placeholder="Buscar por dirección, propietario, cuenta de Rentas...">
+    <select id="filter">
+      <option value="todos">Todos</option>
+      <option value="activos">Activos</option>
+      <option value="completos">Completos</option>
+      <option value="cancelados">Cancelados / no aptos</option>
+    </select>
+    <select id="vendorFilter" style="display:none">
+      <option value="">Todos los vendedores</option>
+    </select>
+    <select id="sort">
+      <option value="recent">Más recientes</option>
+      <option value="progressDesc">Mayor avance</option>
+      <option value="progressAsc">Menor avance</option>
+      <option value="address">Dirección A–Z</option>
+    </select>
+    <div class="count" id="countText"></div>
+  </section>
+
+  <main id="list" class="list">
+    <div class="loader" id="loader">Cargando tus propiedades…</div>
+  </main>
+</div>
+
+<div class="modal-ov" id="newDialog">
+ <div class="modal-card">
+  <div class="modalHead"><h2>Ingresar lead</h2></div>
+  <form id="newForm">
+    <div class="modalBody">
+      <div class="modalGrid">
+        <div class="field full">
+          <label>Dirección del inmueble *</label>
+          <input id="fAddress" type="text" required placeholder="Ej. Av. Colón 1234, Córdoba">
+        </div>
+        <div class="field">
+          <label>Nombre del propietario *</label>
+          <input id="fOwner" type="text" required placeholder="Nombre y apellido">
+        </div>
+        <div class="field">
+          <label>Teléfono / contacto</label>
+          <input id="fPhone" type="text" placeholder="Opcional">
+        </div>
+      </div>
+    </div>
+    <div class="modalFoot">
+      <button type="button" class="btn ghost" id="cancelNew">Cancelar</button>
+      <button type="submit" class="btn primary" style="background:var(--navy);color:white">Crear lead</button>
+    </div>
+  </form>
+ </div>
+</div>
+
+<div class="modal-ov" id="confirmOv">
+ <div class="modal-card" style="max-width:420px">
+  <div class="modalHead" style="background:#9e2732"><h2>Eliminar propiedad</h2></div>
+  <div class="modalBody"><p id="confirmMsg" style="margin:0;font-size:14px;color:var(--ink)"></p></div>
+  <div class="modalFoot">
+    <button type="button" class="btn ghost" id="confirmNo">Cancelar</button>
+    <button type="button" class="btn danger" id="confirmYes">Eliminar</button>
+  </div>
+ </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="savingDot" id="savingDot">Guardando…</div>
+
+<script>
+(() => {
+  /* ---------------------------------------------------------------- */
+  /* Estado y utilidades                                               */
+  /* ---------------------------------------------------------------- */
+  const STAGES = [
+    {key:"pre", label:"Precalificación"},
+    {key:"research", label:"Investigación"},
+    {key:"visit", label:"Visita"},
+    {key:"acm", label:"ACM"},
+    {key:"docs", label:"Documentación"},
+    {key:"media", label:"Audiovisual"},
+    {key:"reports", label:"Informes"},
+    {key:"market", label:"Precio mercado"}
+  ];
+
+  let items = [];
+  let ME = { email:"", isOwner:false };
+  let READY = false;
+
+  const $ = (s,root=document)=>root.querySelector(s);
+  const $$ = (s,root=document)=>[...root.querySelectorAll(s)];
+
+  const blank = (address, owner, phone="") => ({
+    id: (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()+Math.random())),
+    createdAt: new Date().toISOString(),
+    address, owner, phone,
+    cancelled:false,
+    pre:{ done:false, rentas:"", why:"", time:"", otherAgency:"", costs:"", notes:"" },
+    research:{ done:false, identity:false, reportRequested:false, reportUrl:"", status:"" },
+    visit:{ done:false, date:"", tasacionUrl:"", tasacionName:"" },
+    acm:{done:false, reportUrl:""},
+    docs:{done:false, escritura:false, escrituraUrl:"", rest:false, restUrl:""},
+    media:{done:false, mediaUrl:""},
+    reports:{ done:false, r1:false,r1Url:"", r2:false,r2Url:"", r3:false,r3Url:"" },
+    market:{done:false, notes:""},
+    closing:{ negotiation:false,reservation:false,deed:false },
+    _ownerEmail: ME.email
+  });
+
+  // Rellena campos nuevos en leads viejos para evitar errores.
+  function normalize(it){
+    it.visit = it.visit || {done:false};
+    if(it.visit.date===undefined) it.visit.date="";
+    if(it.visit.tasacionUrl===undefined) it.visit.tasacionUrl="";
+    if(it.visit.tasacionName===undefined) it.visit.tasacionName="";
+    return it;
+  }
+
+  function byId(id){ return items.find(x=>x.id===id); }
+
+  /* ---------------------------------------------------------------- */
+  /* Puente con el backend de Apps Script                             */
+  /* ---------------------------------------------------------------- */
+  const server = (fn, ...args) => new Promise((resolve, reject) => {
+    if(!(window.google && google.script && google.script.run)){
+      return reject(new Error("Esta app debe abrirse desde su URL de Google (no como archivo local)."));
+    }
+    google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[fn](...args);
+  });
+
+  let inflight = 0;
+  function savingOn(){ inflight++; $("#savingDot").classList.add("show"); }
+  function savingOff(){ inflight=Math.max(0,inflight-1); if(!inflight) $("#savingDot").classList.remove("show"); }
+
+  const pending = new Map();
+  function persist(item, immediate=false){
+    const run = () => {
+      pending.delete(item.id);
+      savingOn();
+      server("saveLead", item)
+        .then(res => { if(res && res.ownerEmail) item._ownerEmail = res.ownerEmail; })
+        .catch(err => toast("No se pudo guardar: " + (err.message||err), true))
+        .finally(savingOff);
+    };
+    clearTimeout(pending.get(item.id));
+    if(immediate) run();
+    else pending.set(item.id, setTimeout(run, 700));
+  }
+
+  function fileToBase64(file){
+    return new Promise((res,rej)=>{
+      const r=new FileReader();
+      r.onload=()=>res(String(r.result).split(",")[1]||"");
+      r.onerror=()=>rej(new Error("No se pudo leer el archivo."));
+      r.readAsDataURL(file);
+    });
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Lógica de negocio                                                */
+  /* ---------------------------------------------------------------- */
+  function effectiveDone(item, key){
+    if(key==="pre") return !!(item.pre.done && item.pre.rentas.trim());
+    if(key==="research") return !!(item.research.done && item.research.identity && item.research.reportRequested && item.research.status);
+    if(key==="docs") return !!(item.docs.done && item.docs.escritura);
+    if(key==="reports") return !!(item.reports.done && item.reports.r1 && item.reports.r2 && item.reports.r3);
+    return !!item[key]?.done;
+  }
+  function progress(item){
+    const done = STAGES.filter(s=>effectiveDone(item,s.key)).length;
+    return Math.round(done / STAGES.length * 100);
+  }
+  function stageLocked(item,key){
+    return item.cancelled && key!=="research";
+  }
+
+  function escapeHtml(s=""){
+    return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[m]));
+  }
+  function validUrl(u){
+    if(!u) return false;
+    try{ const x=new URL(u); return ["http:","https:"].includes(x.protocol); }catch(e){return false;}
+  }
+  function openLink(u){
+    if(validUrl(u)) window.open(u,"_blank","noopener");
+    else toast("Cargá primero un link válido (http/https).");
+  }
+  function toast(msg, isErr=false){
+    const t=$("#toast"); t.textContent=msg;
+    t.classList.toggle("err", !!isErr);
+    t.classList.add("show");
+    clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"),2600);
+  }
+  // Confirmación propia (no usamos confirm() nativo: queda bloqueado dentro de iframes).
+  function askConfirm(msg, onYes){
+    const ov=$("#confirmOv"); $("#confirmMsg").textContent=msg; ov.classList.add("show");
+    const yes=$("#confirmYes"), no=$("#confirmNo");
+    const close=()=>{ ov.classList.remove("show"); yes.onclick=null; no.onclick=null; ov.onclick=null; };
+    yes.onclick=()=>{ close(); onYes(); };
+    no.onclick=close;
+    ov.onclick=e=>{ if(e.target===ov) close(); };
+  }
+
+  function setPath(obj,path,val){
+    const p=path.split(".");
+    let cur=obj;
+    for(let i=0;i<p.length-1;i++) cur=cur[p[i]];
+    cur[p[p.length-1]]=val;
+  }
+  function getPath(obj,path){
+    return path.split(".").reduce((a,k)=>a?.[k],obj);
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Render                                                           */
+  /* ---------------------------------------------------------------- */
+  function milestoneHtml(item,s){
+    const done=effectiveDone(item,s.key);
+    const disabled=stageLocked(item,s.key);
+    return `
+      <button type="button" class="milestone ${done?"done":""} ${disabled?"disabled":""}" data-open-step="${s.key}" title="Abrir ${escapeHtml(s.label)}">
+        <span class="tick"></span>
+        <span>${escapeHtml(s.label)}</span>
+      </button>`;
+  }
+
+  // Campo genérico para SUBIR un archivo a Drive. Guarda la URL en urlPath
+  // y el nombre en urlPath+"Name".
+  function uploadField(item, label, urlPath, hint){
+    const url = getPath(item, urlPath);
+    const name = getPath(item, urlPath+"Name");
+    const dis = item.cancelled ? "disabled" : "";
+    return `
+      <div class="field">
+        <label>${label}</label>
+        <div class="upRow">
+          <button type="button" class="btn ghost small upBtn" data-up-path="${urlPath}" ${dis}>${url?"Reemplazar archivo":"⬆ Subir archivo"}</button>
+          ${url?`<button type="button" class="btn ghost small" data-open-path="${urlPath}">Abrir</button>`:""}
+          <input type="file" class="upInput" data-up-path="${urlPath}" accept=".xlsx,.xls,.csv,.pdf,.doc,.docx,image/*,video/*" hidden>
+        </div>
+        <div class="hint">${url?("📎 "+escapeHtml(name||"archivo subido")):(hint||"Se guarda en tu Drive.")}</div>
+      </div>`;
+  }
+
+  function panel(item, key, num, name, inner, opts={}){
+    const extra = !!opts.extra;
+    return `
+      <section class="panel ${extra?"extra":""}" data-step="${key}">
+        <h3>${num?`<span class="pnum">${num}</span>`:""}${escapeHtml(name)}</h3>
+        ${inner}
+      </section>`;
+  }
+
+  function vendorName(email){ return email ? email.split("@")[0] : "—"; }
+
+  function card(item){
+    const p=progress(item);
+    const complete=p===100 && !item.cancelled;
+    const status=item.cancelled?"cancelado":complete?"completo":"activo";
+    const dis=item.cancelled?"disabled":"";
+
+    const panels = [
+      panel(item,"pre",1,"Precalificación",`
+        <div class="field">
+          <label>N° cuenta de Rentas *</label>
+          <input type="text" data-path="pre.rentas" value="${escapeHtml(item.pre.rentas)}" placeholder="Obligatorio">
+        </div>
+        <div class="field"><label>¿Por qué necesita vender?</label><textarea data-path="pre.why">${escapeHtml(item.pre.why)}</textarea></div>
+        <div class="field"><label>¿En cuánto tiempo?</label><textarea data-path="pre.time">${escapeHtml(item.pre.time)}</textarea></div>
+        <div class="field"><label>¿Publicado en otra inmobiliaria?</label><textarea data-path="pre.otherAgency">${escapeHtml(item.pre.otherAgency)}</textarea></div>
+        <div class="field"><label>¿Conoce los gastos de vender?</label><textarea data-path="pre.costs">${escapeHtml(item.pre.costs)}</textarea></div>
+        <div class="field"><label>Información extra / notas</label><textarea data-path="pre.notes">${escapeHtml(item.pre.notes)}</textarea></div>
+        <label class="checkline"><input type="checkbox" data-path="pre.done" ${item.pre.done?"checked":""}> Confirmar llamada</label>
+        <div class="hint">Se cumple con la llamada confirmada y el N° de Rentas cargado.</div>`),
+
+      panel(item,"research",2,"Investigación",`
+        <label class="checkline"><input type="checkbox" data-path="research.identity" ${item.research.identity?"checked":""}> Identidad confirmada</label>
+        <label class="checkline"><input type="checkbox" data-path="research.reportRequested" ${item.research.reportRequested?"checked":""}> Informe de matrícula pedido</label>
+        ${uploadField(item,"Informe de matrícula","research.reportUrl","PDF o foto del informe.")}
+        <div class="field">
+          <label>Resultado *</label>
+          <select data-path="research.status">
+            <option value="" ${!item.research.status?"selected":""}>Seleccionar...</option>
+            <option value="apto" ${item.research.status==="apto"?"selected":""}>Apto Venta</option>
+            <option value="pendiente" ${item.research.status==="pendiente"?"selected":""}>Apto pendiente</option>
+            <option value="no_apto" ${item.research.status==="no_apto"?"selected":""}>No apto - Archivar</option>
+          </select>
+        </div>
+        <label class="checkline"><input type="checkbox" data-path="research.done" ${item.research.done?"checked":""}> Investigación confirmada</label>
+        <div class="hint">“No apto” cancela el lead y bloquea los pasos siguientes.</div>`),
+
+      panel(item,"visit",3,"Visita",`
+        <label class="checkline"><input type="checkbox" data-path="visit.done" ${item.visit.done?"checked":""} ${dis}> Visita confirmada / realizada</label>
+        <div class="field"><label>Fecha de la visita</label><input type="date" data-path="visit.date" value="${escapeHtml(item.visit.date||"")}" ${dis}></div>
+        ${uploadField(item,"Planilla de tasación","visit.tasacionUrl","Excel, PDF o foto. Se guarda en tu Drive.")}
+        <div class="hint">Llevar ficha de tasación, recorrido, fotos de mantenimiento y vínculo con el cliente.</div>`),
+
+      panel(item,"acm",4,"ACM",`
+        <label class="checkline"><input type="checkbox" data-path="acm.done" ${item.acm.done?"checked":""} ${dis}> ACM presentado / entregado</label>
+        ${uploadField(item,"ACM / estimación","acm.reportUrl","PDF del ACM.")}
+        <div class="hint">Preparar entregables tangibles y presentar el ACM.</div>`),
+
+      panel(item,"docs",5,"Documentación",`
+        <label class="checkline"><input type="checkbox" data-path="docs.escritura" ${item.docs.escritura?"checked":""} ${dis}> Escritura escaneada</label>
+        ${uploadField(item,"Escritura escaneada","docs.escrituraUrl","PDF o foto de la escritura.")}
+        <label class="checkline"><input type="checkbox" data-path="docs.rest" ${item.docs.rest?"checked":""} ${dis}> Resto de documentación</label>
+        ${uploadField(item,"Resto de documentación","docs.restUrl","Subí el archivo de documentación.")}
+        <label class="checkline"><input type="checkbox" data-path="docs.done" ${item.docs.done?"checked":""} ${dis}> Documentación validada</label>`),
+
+      panel(item,"media",6,"Audiovisual",`
+        <label class="checkline"><input type="checkbox" data-path="media.done" ${item.media.done?"checked":""} ${dis}> HECHO</label>
+        ${uploadField(item,"Fotos / video","media.mediaUrl","Fotos o video. Se guarda en tu Drive.")}
+        <div class="hint">Abrir ventanas, prender luces, despejar superficies y publicar el mismo día.</div>`),
+
+      panel(item,"reports",7,"Informes",`
+        <label class="checkline"><input type="checkbox" data-path="reports.r1" ${item.reports.r1?"checked":""} ${dis}> Informe 1 entregado</label>
+        ${uploadField(item,"Archivo Informe 1","reports.r1Url","PDF del informe 1.")}
+        <label class="checkline"><input type="checkbox" data-path="reports.r2" ${item.reports.r2?"checked":""} ${dis}> Informe 2 entregado</label>
+        ${uploadField(item,"Archivo Informe 2","reports.r2Url","PDF del informe 2.")}
+        <label class="checkline"><input type="checkbox" data-path="reports.r3" ${item.reports.r3?"checked":""} ${dis}> Informe 3 entregado</label>
+        ${uploadField(item,"Archivo Informe 3","reports.r3Url","PDF del informe 3.")}
+        <label class="checkline"><input type="checkbox" data-path="reports.done" ${item.reports.done?"checked":""} ${dis}> Ciclo de informes completado</label>
+        <div class="hint">Informes cada 30 días con conclusión y plan de acción.</div>`),
+
+      panel(item,"market",8,"Precio mercado",`
+        <label class="checkline"><input type="checkbox" data-path="market.done" ${item.market.done?"checked":""} ${dis}> Llevado a precio de mercado</label>
+        <div class="field"><label>Notas de ajuste / conversación</label><textarea data-path="market.notes">${escapeHtml(item.market.notes)}</textarea></div>`),
+
+      panel(item,"closing",null,"Cierre posterior",`
+        <label class="checkline"><input type="checkbox" data-path="closing.negotiation" ${item.closing.negotiation?"checked":""} ${dis}> Negociación</label>
+        <label class="checkline"><input type="checkbox" data-path="closing.reservation" ${item.closing.reservation?"checked":""} ${dis}> Toma de reserva</label>
+        <label class="checkline"><input type="checkbox" data-path="closing.deed" ${item.closing.deed?"checked":""} ${dis}> Proceso de escritura</label>
+        <div class="hint">No modifican el porcentaje de captación.</div>`,{extra:true}),
+
+      panel(item,"lead",null,"Datos del lead",`
+        <div class="field"><label>Dirección</label><input type="text" data-path="address" value="${escapeHtml(item.address)}"></div>
+        <div class="field"><label>Propietario</label><input type="text" data-path="owner" value="${escapeHtml(item.owner)}"></div>
+        <div class="field"><label>Contacto</label><input type="text" data-path="phone" value="${escapeHtml(item.phone)}"></div>
+        ${ME.isOwner?`<div class="hint">Vendedor: <b>${escapeHtml(item._ownerEmail||"—")}</b></div>`:""}`,{extra:true})
+    ].join("");
+
+    return `
+    <article class="property" data-id="${item.id}" data-status="${status}" style="--p:${p}">
+      <div class="row">
+        <div class="identity">
+          <div class="address">${escapeHtml(item.address)}</div>
+          <div class="owner">${escapeHtml(item.owner)}${item.phone?` · ${escapeHtml(item.phone)}`:""}</div>
+          <div class="meta">
+            ${item.cancelled?`<span class="pill cancel">NO APTO · Lead cancelado</span>`:
+              complete?`<span class="pill done">Proceso completo</span>`:
+              `<span class="pill">Lead activo</span>`}
+            ${item.pre.rentas?`<span class="pill">Rentas: ${escapeHtml(item.pre.rentas)}</span>`:""}
+            ${ME.isOwner?`<span class="pill vendor">👤 ${escapeHtml(vendorName(item._ownerEmail))}</span>`:""}
+          </div>
+          <div class="rowlinks">
+            <button type="button" class="rowlink" data-open-step="lead">✎ Datos del lead</button>
+            <button type="button" class="rowlink" data-open-step="closing">★ Cierre posterior</button>
+          </div>
+        </div>
+
+        <div class="milestones">
+          ${STAGES.map(s=>milestoneHtml(item,s)).join("")}
+        </div>
+
+        <div class="progressBox">
+          <div class="progressTop"><span>Avance</span><span class="pct">${p}%</span></div>
+          <div class="bar"><div style="width:${p}%"></div></div>
+        </div>
+
+        <button type="button" class="del" aria-label="Eliminar propiedad" title="Eliminar propiedad">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2m1 0-1 14H7L6 6"/></svg>
+        </button>
+      </div>
+
+      <div class="details">
+        <div class="detailsHint">Tocá un hito para ver y cargar ese paso.</div>
+        <div class="panels">${panels}</div>
+
+        <div class="footerActions">
+          <div class="created">Ingresado: ${new Date(item.createdAt).toLocaleString("es-AR")}</div>
+          <div class="rightBtns">
+            <button type="button" class="btn ghost small reopenBtn" ${!item.cancelled?"style='display:none'":""}>Reactivar lead</button>
+          </div>
+        </div>
+      </div>
+    </article>`;
+  }
+
+  function render(){
+    if(!READY) return;
+    const q=$("#search").value.trim().toLowerCase();
+    const f=$("#filter").value;
+    const s=$("#sort").value;
+    const vf=$("#vendorFilter").value;
+
+    let arr=items.filter(i=>{
+      const hay=[i.address,i.owner,i.phone,i.pre.rentas,i._ownerEmail].join(" ").toLowerCase().includes(q);
+      const p=progress(i);
+      const okf = f==="todos" ||
+        (f==="activos" && !i.cancelled && p<100) ||
+        (f==="completos" && !i.cancelled && p===100) ||
+        (f==="cancelados" && i.cancelled);
+      const okv = !vf || (i._ownerEmail||"").toLowerCase()===vf;
+      return hay && okf && okv;
+    });
+
+    arr.sort((a,b)=>{
+      if(s==="progressDesc") return progress(b)-progress(a);
+      if(s==="progressAsc") return progress(a)-progress(b);
+      if(s==="address") return a.address.localeCompare(b.address,"es");
+      return new Date(b.createdAt)-new Date(a.createdAt);
+    });
+
+    $("#countText").textContent=`${arr.length} visible${arr.length===1?"":"s"}`;
+    $("#list").innerHTML=arr.length ? arr.map(card).join("") :
+      `<div class="empty"><strong>No hay propiedades para mostrar.</strong>Ingresá un nuevo lead o cambiá los filtros.</div>`;
+
+    wireCards();
+    updateStats();
+  }
+
+  function updateStats(){
+    const total=items.length;
+    const activos=items.filter(i=>!i.cancelled && progress(i)<100);
+    const done=items.filter(i=>!i.cancelled && progress(i)===100).length;
+    // Avance promedio: solo sobre los leads activos.
+    const avg=activos.length?Math.round(activos.reduce((a,i)=>a+progress(i),0)/activos.length):0;
+    $("#stTotal").textContent=total;
+    $("#stActive").textContent=activos.length;
+    $("#stDone").textContent=done;
+    $("#stAvg").textContent=avg+"%";
+  }
+
+  function refreshVendorFilter(){
+    if(!ME.isOwner) return;
+    const sel=$("#vendorFilter");
+    const current=sel.value;
+    const emails=[...new Set(items.map(i=>(i._ownerEmail||"").toLowerCase()).filter(Boolean))].sort();
+    sel.innerHTML=`<option value="">Todos los vendedores</option>`+
+      emails.map(e=>`<option value="${escapeHtml(e)}">${escapeHtml(vendorName(e))}</option>`).join("");
+    sel.value=emails.includes(current)?current:"";
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Mutaciones                                                       */
+  /* ---------------------------------------------------------------- */
+  // Devuelve un mensaje si NO se puede confirmar el hito todavía (o null si está OK).
+  function doneRequirement(item,key){
+    if(key==="pre" && !item.pre.rentas.trim())
+      return "Para confirmar Precalificación, cargá el N° de cuenta de Rentas.";
+    if(key==="research" && !(item.research.identity && item.research.reportRequested && item.research.status))
+      return "Completá identidad, pedido de informe y resultado antes de confirmar Investigación.";
+    if(key==="docs" && !item.docs.escritura)
+      return "Para confirmar Documentación, primero marcá Escritura escaneada.";
+    if(key==="reports" && !(item.reports.r1 && item.reports.r2 && item.reports.r3))
+      return "Para cerrar Informes, marcá los informes 1, 2 y 3.";
+    return null;
+  }
+
+  function wireCards(){
+    $$(".property").forEach(el=>{
+      const id=el.dataset.id;
+      const item=byId(id);
+
+      function markActive(key){
+        $$("[data-open-step]",el).forEach(m=>m.classList.toggle("active", m.dataset.openStep===key));
+      }
+
+      // Ícono de tacho: eliminar la propiedad (con confirmación propia).
+      $(".del",el)?.addEventListener("click",()=>{
+        askConfirm(`¿Eliminar "${item.address}"? Esta acción no se puede deshacer.`, ()=>{
+          savingOn();
+          server("deleteLead", id)
+            .then(()=>{ items=items.filter(x=>x.id!==id); refreshVendorFilter(); render(); toast("Propiedad eliminada."); })
+            .catch(err=>toast("No se pudo eliminar: "+(err.message||err), true))
+            .finally(savingOff);
+        });
+      });
+
+      // Tocar un hito (o "Datos"/"Cierre") abre SÓLO ese paso. Uno a la vez.
+      $$("[data-open-step]",el).forEach(btn=>{
+        btn.addEventListener("click",()=>{
+          const key=btn.dataset.openStep;
+          const active=$(".panel.active",el)?.dataset.step;
+          if(el.classList.contains("open") && active===key){
+            el.classList.remove("open"); markActive(null);
+          }else{
+            $$(".panel",el).forEach(p=>p.classList.toggle("active", p.dataset.step===key));
+            el.classList.add("open"); markActive(key);
+          }
+        });
+      });
+
+      // Campos del detalle.
+      $$("[data-path]",el).forEach(inp=>{
+        const isText = inp.matches("textarea,input[type='text'],input[type='url']");
+        const ev = isText ? "input" : "change";
+        inp.addEventListener(ev,()=>{
+          // Al confirmar un hito con condiciones, avisar si falta algo.
+          if(inp.type==="checkbox" && inp.checked){
+            const m=/^(pre|research|docs|reports)\.done$/.exec(inp.dataset.path);
+            if(m){
+              const req=doneRequirement(item, m[1]);
+              if(req){ toast(req); inp.checked=false; return; }
+            }
+          }
+          let value=inp.type==="checkbox"?inp.checked:inp.value;
+          setPath(item,inp.dataset.path,value);
+
+          if(inp.dataset.path==="research.status"){
+            item.cancelled = value==="no_apto";
+            if(item.cancelled){ item.research.done=true; toast("Lead marcado como NO APTO y cancelado."); }
+          }
+
+          persist(item, !isText);
+
+          if(ev==="change" || inp.type==="checkbox" || inp.dataset.path==="address" || inp.dataset.path==="owner"){
+            renderKeepOpen(id);
+          }else{
+            refreshCardProgress(el,item);
+          }
+        });
+      });
+
+      // Botones "Abrir" de links.
+      $$("[data-open-path]",el).forEach(btn=>{
+        btn.addEventListener("click",()=>openLink(getPath(item,btn.dataset.openPath)));
+      });
+
+      // Subida de archivos (cada campo con su botón "Subir archivo").
+      $$(".upBtn",el).forEach(btn=>{
+        btn.addEventListener("click",()=>{
+          if(item.cancelled) return;
+          const inp=$(`.upInput[data-up-path="${btn.dataset.upPath}"]`,el);
+          if(inp) inp.click();
+        });
+      });
+      $$(".upInput",el).forEach(inp=>{
+        inp.addEventListener("change",async ()=>{
+          const path=inp.dataset.upPath;
+          const file=inp.files?.[0]; if(!file) return;
+          if(file.size > 25*1024*1024){ toast("El archivo supera 25 MB.", true); inp.value=""; return; }
+          const btn=$(`.upBtn[data-up-path="${path}"]`,el);
+          try{
+            savingOn(); if(btn){ btn.disabled=true; btn.textContent="Subiendo…"; }
+            const b64=await fileToBase64(file);
+            const res=await server("uploadFile", item.id, b64, file.name, file.type||"application/octet-stream");
+            setPath(item, path, res.url);
+            setPath(item, path+"Name", res.name);
+            persist(item, true);
+            toast("Archivo subido a tu Drive.");
+            renderKeepOpen(id);
+          }catch(err){ toast("No se pudo subir: "+(err.message||err), true); if(btn) btn.disabled=false; }
+          finally{ savingOff(); inp.value=""; }
+        });
+      });
+
+      // Reactivar.
+      const rb=$(".reopenBtn",el);
+      if(rb) rb.addEventListener("click",()=>{
+        item.cancelled=false;
+        if(item.research.status==="no_apto") item.research.status="pendiente";
+        persist(item, true); renderKeepOpen(id); toast("Lead reactivado.");
+      });
+    });
+  }
+
+  function refreshCardProgress(el,item){
+    const p=progress(item);
+    el.style.setProperty("--p",p);
+    $(".pct",el).textContent=p+"%";
+    $(".bar > div",el).style.width=p+"%";
+    updateStats();
+  }
+
+  function renderKeepOpen(id){
+    const prop=$(`.property[data-id="${id}"]`);
+    const wasOpen=prop?.classList.contains("open");
+    const activeStep=prop?.querySelector(".panel.active")?.dataset.step;
+    render();
+    const np=$(`.property[data-id="${id}"]`);
+    if(np && wasOpen && activeStep){
+      np.classList.add("open");
+      const p=np.querySelector(`.panel[data-step="${activeStep}"]`); if(p) p.classList.add("active");
+      const m=np.querySelector(`[data-open-step="${activeStep}"]`); if(m) m.classList.add("active");
+    }
+  }
+
+  /* ---------------------------------------------------------------- */
+  /* Controles globales                                               */
+  /* ---------------------------------------------------------------- */
+  $("#newBtn").addEventListener("click",()=>{
+    if(!READY) return;
+    $("#newForm").reset(); $("#newDialog").classList.add("show"); setTimeout(()=>$("#fAddress").focus(),50);
+  });
+  $("#cancelNew").addEventListener("click",()=>$("#newDialog").classList.remove("show"));
+  $("#newDialog").addEventListener("click",e=>{ if(e.target===$("#newDialog")) $("#newDialog").classList.remove("show"); });
+  $("#newForm").addEventListener("submit",e=>{
+    e.preventDefault();
+    const a=$("#fAddress").value.trim(), o=$("#fOwner").value.trim(), p=$("#fPhone").value.trim();
+    if(!a||!o) return;
+    const item=blank(a,o,p);
+    items.unshift(item);
+    persist(item, true);
+    $("#newDialog").classList.remove("show");
+    refreshVendorFilter();
+    render();
+    toast("Lead ingresado.");
+  });
+
+  $("#search").addEventListener("input",render);
+  $("#filter").addEventListener("change",render);
+  $("#sort").addEventListener("change",render);
+  $("#vendorFilter").addEventListener("change",render);
+
+  /* ---------------------------------------------------------------- */
+  /* Arranque                                                         */
+  /* ---------------------------------------------------------------- */
+  function boot(){
+    server("getBootstrap")
+      .then(res => {
+        ME = { email: res.email, isOwner: res.isOwner };
+        items = (res.items || []).map(normalize);
+        READY = true;
+
+        $("#userEmail").textContent = ME.email;
+        $("#userRole").textContent = ME.isOwner ? "Administrador" : "Vendedor";
+        $("#userChip").style.display = "flex";
+        if(ME.isOwner) $("#vendorFilter").style.display = "";
+
+        refreshVendorFilter();
+        render();
+      })
+      .catch(err => {
+        READY = false;
+        $("#list").innerHTML =
+          `<div class="empty"><strong>No pudimos cargar tus datos.</strong>${escapeHtml(err.message||String(err))}<br><br>
+           Asegurate de haber abierto la app con tu cuenta del dominio <b>juarezbeltran.com.ar</b>.</div>`;
+      });
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>
