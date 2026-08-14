@@ -4,7 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Pipeline ACM · Juarez Beltrán</title>
-<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png">
+<link rel="apple-touch-icon" href="apple-touch-icon-180.png">
 <meta name="robots" content="noindex">
 
 <!--
@@ -15,7 +18,7 @@
 <meta http-equiv="refresh" content="0; url=https://script.google.com/a/macros/juarezbeltran.com.ar/s/AKfycbyXblPtFd6MWy3wMJHG7udP7737ZO2xhkMkAH3K1ZfSvswc-67LGBk5vNHUbSv7bAUt/exec">
 
 <style>
-  :root{ --navy:#10295a; --navy2:#17386f; --green:#1f9d61; }
+  :root{ --navy:#123a72; --navy2:#0e2b57; --green:#1f9d61; }
   *{box-sizing:border-box}
   html,body{height:100%}
   body{
@@ -23,25 +26,25 @@
     background:linear-gradient(135deg,var(--navy),var(--navy2)); color:#fff;
     display:flex; align-items:center; justify-content:center; text-align:center; padding:24px;
   }
-  .box{max-width:420px}
-  .logo{font-size:22px; font-weight:850; letter-spacing:.2px; margin-bottom:6px}
-  .sub{opacity:.8; font-size:14px; margin-bottom:26px}
+  .box{max-width:440px}
+  .logo{width:min(320px,78vw); height:auto; margin:0 auto 26px; display:block}
   .spinner{
-    width:44px; height:44px; margin:0 auto 22px; border-radius:50%;
+    width:40px; height:40px; margin:0 auto 20px; border-radius:50%;
     border:4px solid rgba(255,255,255,.22); border-top-color:var(--green);
     animation:spin 1s linear infinite;
   }
   @keyframes spin{to{transform:rotate(360deg)}}
   @media (prefers-reduced-motion:reduce){ .spinner{animation:none} }
-  .hint{font-size:13px; opacity:.85}
+  .title{font-size:15px; font-weight:800; letter-spacing:.3px; opacity:.95; margin-bottom:20px}
+  .hint{font-size:13px; opacity:.82}
   a.manual{display:inline-block; margin-top:4px; color:#fff; font-weight:750; text-decoration:underline; text-underline-offset:3px}
 </style>
 </head>
 <body>
   <div class="box">
+    <img class="logo" src="logo-jb-blanco.png" alt="Juarez Beltrán · Asesores Inmobiliarios">
+    <div class="title">Pipeline de Captación · ACM</div>
     <div class="spinner" role="status" aria-label="Cargando"></div>
-    <div class="logo">Pipeline de Captación · ACM</div>
-    <div class="sub">Juarez Beltrán · Asesores Inmobiliarios</div>
     <p class="hint">
       Redirigiendo a la aplicación…<br>
       Si no ocurre en unos segundos,
