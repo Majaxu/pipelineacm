@@ -197,6 +197,9 @@
   .docrow{display:grid;grid-template-columns:1fr auto;gap:7px;align-items:end}
   .linkBtn{white-space:nowrap}
   .upRow{display:flex;gap:7px;flex-wrap:wrap}
+  .linkRow{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}
+  .linkRow[hidden]{display:none}
+  .linkRow input{flex:1 1 220px;min-width:0}
   .hint{font-size:10px;color:var(--muted);margin-top:4px}
   .footerActions{
     display:flex;justify-content:space-between;gap:10px;align-items:center;margin-top:14px;padding-top:13px;border-top:1px solid var(--line)
@@ -482,9 +485,10 @@
     clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove("show"),2600);
   }
   // Confirmación propia (no usamos confirm() nativo: queda bloqueado dentro de iframes).
-  function askConfirm(msg, onYes){
+  function askConfirm(msg, onYes, yesLabel){
     const ov=$("#confirmOv"); $("#confirmMsg").textContent=msg; ov.classList.add("show");
     const yes=$("#confirmYes"), no=$("#confirmNo");
+    yes.textContent=yesLabel||"Eliminar";
     const close=()=>{ ov.classList.remove("show"); yes.onclick=null; no.onclick=null; ov.onclick=null; };
     yes.onclick=()=>{ close(); onYes(); };
     no.onclick=close;
@@ -514,18 +518,35 @@
       </button>`;
   }
 
-  // Campo genérico para SUBIR un archivo a Drive. Guarda la URL en urlPath
-  // y el nombre en urlPath+"Name".
+  function hostOf(u){
+    try{ return new URL(u).hostname.replace(/^www\./,""); }catch(e){ return "enlace"; }
+  }
+
+  // Campo genérico: SUBIR un archivo a Drive o PEGAR un enlace. Un solo lugar por campo.
+  // Guarda la URL en urlPath y el nombre del archivo en urlPath+"Name"
+  // (si Name está vacío y hay URL, es un enlace pegado).
   function uploadField(item, label, urlPath, hint){
     var url = getPath(item, urlPath);
     var name = getPath(item, urlPath+"Name");
     var dis = item.cancelled ? " disabled" : "";
     var h = "";
     h += "<div class=\"field\"><label>"+label+"</label><div class=\"upRow\">";
-    h += "<button type=\"button\" class=\"btn ghost small upBtn\" data-up-path=\""+urlPath+"\""+dis+">"+(url?"Reemplazar archivo":"Subir archivo")+"</button>";
+    h += "<button type=\"button\" class=\"btn ghost small upBtn\" data-up-path=\""+urlPath+"\""+dis+">"+(url?"Reemplazar con archivo":"Subir archivo")+"</button>";
+    h += "<button type=\"button\" class=\"btn ghost small linkBtn\" data-link-path=\""+urlPath+"\""+dis+">"+(url?"Reemplazar con enlace":"Pegar enlace")+"</button>";
     if(url) h += "<button type=\"button\" class=\"btn ghost small\" data-open-path=\""+urlPath+"\">Abrir</button>";
-    h += "<input type=\"file\" class=\"upInput\" data-up-path=\""+urlPath+"\" accept=\".xlsx,.xls,.csv,.pdf,.doc,.docx,image/*\" hidden>";
-    h += "</div><div class=\"hint\">"+(url?("Archivo: "+escapeHtml(name||"archivo subido")):(hint||"Se guarda en tu Drive."))+"</div></div>";
+    if(url) h += "<button type=\"button\" class=\"btn danger small clearBtn\" data-clear-path=\""+urlPath+"\""+dis+">Quitar</button>";
+    h += "<input type=\"file\" class=\"upInput\" data-up-path=\""+urlPath+"\" accept=\".xlsx,.xls,.csv,.pdf,.doc,.docx,image/*,video/*\" hidden>";
+    h += "</div>";
+    h += "<div class=\"linkRow\" data-link-row=\""+urlPath+"\" hidden>";
+    h += "<input type=\"url\" class=\"linkInput\" placeholder=\"https://...\" value=\""+escapeHtml(url && !name ? url : "")+"\">";
+    h += "<button type=\"button\" class=\"btn ghost small linkSave\">Guardar</button>";
+    h += "<button type=\"button\" class=\"btn ghost small linkCancel\">Cancelar</button>";
+    h += "</div>";
+    var info;
+    if(!url) info = hint || "Subí un archivo o pegá un enlace.";
+    else if(name) info = "Archivo: "+escapeHtml(name);
+    else info = "Enlace: "+escapeHtml(hostOf(url));
+    h += "<div class=\"hint\">"+info+"</div></div>";
     return h;
   }
 
@@ -857,6 +878,53 @@
             renderKeepOpen(id);
           }catch(err){ toast("No se pudo subir: "+(err.message||err), true); if(btn) btn.disabled=false; }
           finally{ savingOff(); inp.value=""; }
+        });
+      });
+
+      // Pegar enlace (alternativa a subir archivo).
+      $$(".linkBtn",el).forEach(btn=>{
+        const path=btn.dataset.linkPath;
+        const row=$(`.linkRow[data-link-row="${path}"]`,el);
+        if(!row) return;
+        const inp=$(".linkInput",row);
+        const close=()=>{ row.hidden=true; };
+        const save=()=>{
+          const v=inp.value.trim();
+          if(!validUrl(v)){ toast("Pegá un enlace válido (que empiece con http:// o https://).", true); inp.focus(); return; }
+          setPath(item, path, v);
+          setPath(item, path+"Name", "");
+          persist(item, true);
+          toast("Enlace guardado.");
+          renderKeepOpen(id);
+        };
+        btn.addEventListener("click",()=>{
+          if(item.cancelled) return;
+          row.hidden=!row.hidden;
+          if(!row.hidden){ inp.focus(); inp.select(); }
+        });
+        $(".linkSave",row).addEventListener("click",save);
+        $(".linkCancel",row).addEventListener("click",close);
+        inp.addEventListener("keydown",e=>{
+          if(e.key==="Enter"){ e.preventDefault(); save(); }
+          if(e.key==="Escape"){ e.preventDefault(); close(); }
+        });
+      });
+
+      // Quitar archivo o enlace del campo (no borra nada de Drive).
+      $$(".clearBtn",el).forEach(btn=>{
+        btn.addEventListener("click",()=>{
+          if(item.cancelled) return;
+          const path=btn.dataset.clearPath;
+          const isFile=!!getPath(item, path+"Name");
+          askConfirm(isFile
+            ? "¿Quitar el archivo de este campo? No se borra de Drive: queda en la carpeta Pipeline ACM · Archivos."
+            : "¿Quitar el enlace de este campo?", ()=>{
+            setPath(item, path, "");
+            setPath(item, path+"Name", "");
+            persist(item, true);
+            toast(isFile ? "Archivo quitado." : "Enlace quitado.");
+            renderKeepOpen(id);
+          }, "Quitar");
         });
       });
 
