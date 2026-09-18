@@ -100,10 +100,22 @@ function getBootstrap() {
   return { email: email, isOwner: owner, items: items };
 }
 
+/** Ejecuta fn con el lock del script (evita que dos escrituras se pisen). */
+function withLock_(fn) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try { return fn(); }
+  finally { lock.releaseLock(); }
+}
+
 /** Crea o actualiza un lead. Devuelve campos autorizados por el servidor. */
 function saveLead(item) {
   const email = currentEmail_();
   if (!item || !item.id) throw new Error('Lead inválido.');
+  return withLock_(() => saveLeadLocked_(item, email));
+}
+
+function saveLeadLocked_(item, email) {
 
   const sh = sheet_();
   const existing = readAll_().find(r => String(r.cells[0]) === String(item.id));
@@ -140,6 +152,10 @@ function saveLead(item) {
 /** Elimina un lead (solo el dueño del lead o el APP_OWNER). */
 function deleteLead(id) {
   const email = currentEmail_();
+  return withLock_(() => deleteLeadLocked_(id, email));
+}
+
+function deleteLeadLocked_(id, email) {
   const sh = sheet_();
   const existing = readAll_().find(r => String(r.cells[0]) === String(id));
   if (!existing) return { ok: true, id: id };
@@ -161,6 +177,7 @@ function effectiveDone_(item, key) {
   if (key === 'research') return !!(item.research && item.research.done && item.research.identity && item.research.reportRequested && item.research.status);
   if (key === 'docs')     return !!(item.docs && item.docs.done && item.docs.escritura);
   if (key === 'reports')  return !!(item.reports && item.reports.done && item.reports.r1 && item.reports.r2 && item.reports.r3);
+  if (key === 'market')   return !!(item.market && item.market.done && item.market.finished);
   return !!(item[key] && item[key].done);
 }
 function progressOf_(item) {
@@ -250,5 +267,64 @@ function uploadFile(leadId, base64, filename, mime) {
   const blob = Utilities.newBlob(Utilities.base64Decode(base64), mime || 'application/octet-stream', filename || ('archivo-' + leadId));
   const file = folder.createFile(blob);
   file.setDescription('Lead ' + leadId + ' · subido por ' + email);
-  return { url: file.getUrl(), name: file.getName() };
+
+  // Lectura para cualquier cuenta del dominio que tenga el link (sin pedir acceso).
+  let shared = true, warning = '';
+  try { shareWithDomain_(file); }
+  catch (e) { shared = false; warning = String(e.message || e); }
+
+  return { url: file.getUrl(), name: file.getName(), shared: shared, warning: warning };
+}
+
+function shareWithDomain_(file) {
+  file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+}
+
+/* ------------------------------------------------------------------ */
+/* Funciones para correr UNA vez desde el editor                       */
+/* ------------------------------------------------------------------ */
+
+/** Comparte con el dominio (solo lectura) los archivos que ya estaban subidos. */
+function shareExistingFiles() {
+  const folder = folderNextTo_(FILES_FOLDER);
+  const it = folder.getFiles();
+  let ok = 0, fail = [];
+  while (it.hasNext()) {
+    const f = it.next();
+    try { shareWithDomain_(f); ok++; }
+    catch (e) { fail.push(f.getName() + ': ' + (e.message || e)); }
+  }
+  const msg = 'Compartidos: ' + ok + (fail.length ? ' · Fallaron: ' + fail.length + '\n' + fail.join('\n') : '');
+  Logger.log(msg);
+  return msg;
+}
+
+/**
+ * OPCIONAL. Marca "Propiedad finalizada" en los leads que antes del cambio
+ * estaban al 100 % (tenían los 8 hitos, con precio de mercado marcado),
+ * para que no bajen a 88 %. Si no la corrés, esos leads quedan activos
+ * hasta que alguien marque Propiedad finalizada.
+ */
+function migrateFinished() {
+  return withLock_(() => {
+    const sh = sheet_();
+    const col = HEADERS.indexOf('data');
+    let n = 0;
+    readAll_().forEach(r => {
+      const item = rowToItem_(r.cells);
+      if (!item || !item.id || item.cancelled || !item.market || !item.market.done || item.market.finished) return;
+      const prevKeys = ['pre', 'research', 'visit', 'acm', 'docs', 'media', 'reports'];
+      if (!prevKeys.every(k => effectiveDone_(item, k))) return;
+      item.market.finished = true;
+      const cells = r.cells.slice();
+      cells[HEADERS.indexOf('status')]   = statusOf_(item);
+      cells[HEADERS.indexOf('progress')] = progressOf_(item);
+      cells[col] = JSON.stringify(item);
+      sh.getRange(r.row, 1, 1, HEADERS.length).setValues([cells]);
+      n++;
+    });
+    const msg = 'Leads marcados como finalizados: ' + n;
+    Logger.log(msg);
+    return msg;
+  });
 }
