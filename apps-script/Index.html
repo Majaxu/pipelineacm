@@ -385,7 +385,7 @@
     docs:{done:false, escritura:false, escrituraUrl:"", rest:false, restUrl:""},
     media:{done:false, mediaUrl:""},
     reports:{ done:false, r1:false,r1Url:"", r2:false,r2Url:"", r3:false,r3Url:"" },
-    market:{done:false, notes:""},
+    market:{done:false, finished:false, notes:""},
     closing:{ negotiation:false,reservation:false,deed:false },
     _ownerEmail: ME.email
   });
@@ -396,6 +396,9 @@
     if(it.visit.date===undefined) it.visit.date="";
     if(it.visit.tasacionUrl===undefined) it.visit.tasacionUrl="";
     if(it.visit.tasacionName===undefined) it.visit.tasacionName="";
+    it.market = it.market || {done:false, notes:""};
+    if(it.market.finished===undefined) it.market.finished=false;
+    if(it.market.notes===undefined) it.market.notes="";
     return it;
   }
 
@@ -416,14 +419,17 @@
   function savingOff(){ inflight=Math.max(0,inflight-1); if(!inflight) $("#savingDot").classList.remove("show"); }
 
   const pending = new Map();
+  const chains = new Map(); // un guardado a la vez por lead, en orden
   function persist(item, immediate=false){
     const run = () => {
       pending.delete(item.id);
       savingOn();
-      server("saveLead", item)
+      const prev = chains.get(item.id) || Promise.resolve();
+      const next = prev.then(() => server("saveLead", item))
         .then(res => { if(res && res.ownerEmail) item._ownerEmail = res.ownerEmail; })
         .catch(err => toast("No se pudo guardar: " + (err.message||err), true))
         .finally(savingOff);
+      chains.set(item.id, next);
     };
     clearTimeout(pending.get(item.id));
     if(immediate) run();
@@ -447,6 +453,7 @@
     if(key==="research") return !!(item.research.done && item.research.identity && item.research.reportRequested && item.research.status);
     if(key==="docs") return !!(item.docs.done && item.docs.escritura);
     if(key==="reports") return !!(item.reports.done && item.reports.r1 && item.reports.r2 && item.reports.r3);
+    if(key==="market") return !!(item.market.done && item.market.finished);
     return !!item[key]?.done;
   }
   function progress(item){
@@ -604,6 +611,8 @@
 
       panel(item,"market",8,"Precio mercado",`
         <label class="checkline"><input type="checkbox" data-path="market.done" ${item.market.done?"checked":""} ${dis}> Llevado a precio de mercado</label>
+        <label class="checkline"><input type="checkbox" data-path="market.finished" ${item.market.finished?"checked":""} ${dis}> Propiedad finalizada</label>
+        <div class="hint">El proceso queda completo recién al marcar Propiedad finalizada.</div>
         <div class="field"><label>Notas de ajuste / conversación</label><textarea data-path="market.notes">${escapeHtml(item.market.notes)}</textarea></div>`),
 
       panel(item,"closing",null,"Cierre posterior",`
@@ -734,6 +743,8 @@
       return "Para confirmar Documentación, primero marcá Escritura escaneada.";
     if(key==="reports" && !(item.reports.r1 && item.reports.r2 && item.reports.r3))
       return "Para cerrar Informes, marcá los informes 1, 2 y 3.";
+    if(key==="market" && !item.market.done)
+      return "Para marcar Propiedad finalizada, primero marcá Llevado a precio de mercado.";
     return null;
   }
 
@@ -772,33 +783,47 @@
       });
 
       // Campos del detalle.
+      // Textos: mientras se escribe NO se redibuja la tarjeta (eso hacía perder el foco);
+      // se guarda con demora y al salir del campo se guarda en el momento.
+      function refreshIdentity(){
+        const a=$(".identity .address",el), o=$(".identity .owner",el);
+        if(a) a.textContent=item.address;
+        if(o) o.textContent=item.owner+(item.phone?" \u00B7 "+item.phone:"");
+      }
       $$("[data-path]",el).forEach(inp=>{
         const isText = inp.matches("textarea,input[type='text'],input[type='url']");
-        const ev = isText ? "input" : "change";
-        inp.addEventListener(ev,()=>{
+        if(isText){
+          inp.addEventListener("input",()=>{
+            setPath(item,inp.dataset.path,inp.value);
+            if(["address","owner","phone"].includes(inp.dataset.path)) refreshIdentity();
+            persist(item);
+            refreshCardProgress(el,item);
+          });
+          inp.addEventListener("change",()=>persist(item, true));
+          return;
+        }
+        inp.addEventListener("change",()=>{
           // Al confirmar un hito con condiciones, avisar si falta algo.
           if(inp.type==="checkbox" && inp.checked){
-            const m=/^(pre|research|docs|reports)\.done$/.exec(inp.dataset.path);
+            const m=/^(pre|research|docs|reports)\.done$|^(market)\.finished$/.exec(inp.dataset.path);
             if(m){
-              const req=doneRequirement(item, m[1]);
+              const req=doneRequirement(item, m[1]||m[2]);
               if(req){ toast(req); inp.checked=false; return; }
             }
           }
           let value=inp.type==="checkbox"?inp.checked:inp.value;
           setPath(item,inp.dataset.path,value);
 
+          // Si se desmarca precio de mercado, la propiedad deja de estar finalizada.
+          if(inp.dataset.path==="market.done" && !value) item.market.finished=false;
+
           if(inp.dataset.path==="research.status"){
             item.cancelled = value==="no_apto";
             if(item.cancelled){ item.research.done=true; toast("Lead marcado como NO APTO y cancelado."); }
           }
 
-          persist(item, !isText);
-
-          if(ev==="change" || inp.type==="checkbox" || inp.dataset.path==="address" || inp.dataset.path==="owner"){
-            renderKeepOpen(id);
-          }else{
-            refreshCardProgress(el,item);
-          }
+          persist(item, true);
+          renderKeepOpen(id);
         });
       });
 
@@ -828,7 +853,7 @@
             setPath(item, path, res.url);
             setPath(item, path+"Name", res.name);
             persist(item, true);
-            toast("Archivo subido a tu Drive.");
+            toast(res.shared===false ? "Archivo subido, pero no se pudo compartir con el dominio: "+(res.warning||"") : "Archivo subido a tu Drive.", res.shared===false);
             renderKeepOpen(id);
           }catch(err){ toast("No se pudo subir: "+(err.message||err), true); if(btn) btn.disabled=false; }
           finally{ savingOff(); inp.value=""; }
